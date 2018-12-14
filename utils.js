@@ -3,35 +3,40 @@ const cheerio = require("cheerio");
 
 const options = {
   headers: {
-    "User-Agent": "Mozilla/5.0"
+    "User-Agent": "Mozilla/5.0 (Windows NT 6.1; Win64; x64; rv:47.0) Gecko/20100101 Firefox/47.0"
   }
 };
 
-const getResults = (query, callback) => {
+const searchRecipe = (query, callback) => {
   const url = `https://www.tudoreceitas.com/pesquisa/q/${query}/type/1`;
 
   request(url, options, (error, res, html) => {
     if (error || res.statusCode !== 200) {
-      return `${res.statusCode}: ${error}`;
+      return callback({
+        error: {
+          code: res.statusCode,
+          message: error
+        }
+      });      
     }
 
-    const chr = cheerio.load(html);
+    const scraper = cheerio.load(html);
 
-    const results = [];
+    const searchResults = [];
 
-    chr("div.resultado.link").each((i, element) => {
-      const result = chr(element).find("a.titulo.titulo--resultado");
+    scraper("div.resultado.link").each((index, element) => {
+      const result = scraper(element).find("a.titulo.titulo--resultado");
 
       const title = result.text();
       const link = result.attr("href");
 
-      results.push({
+      searchResults.push({
         title: title,
         link: link
       });
     });
 
-    scrapeData(results[0].link, callback);
+    scrapeData(searchResults[0].link, callback);
   });
 };
 
@@ -41,6 +46,8 @@ const scrapeData = (url, callback) => {
       return `${res.statusCode}: ${error}`;
     }
 
+    const scraper = cheerio.load(html);
+
     let result = {
       title: "",
       link: url,
@@ -49,11 +56,9 @@ const scrapeData = (url, callback) => {
       instructions: []
     };
 
-    const chr = cheerio.load(html);
+    result.title = scraper("h1.titulo.titulo--articulo").text();
 
-    result.title = chr("h1.titulo.titulo--articulo").text();
-
-    const properties = chr("div.properties");
+    const properties = scraper("div.properties");
     result.properties.portion = properties
       .find("span.property.comensales")
       .text();
@@ -67,8 +72,8 @@ const scrapeData = (url, callback) => {
       .find("span.property.dificultad")
       .text();
 
-    chr("div.ingredientes ul li.ingrediente").each((i, element) => {
-      const ingredient = chr(element).find("label");
+    scraper("div.ingredientes ul li.ingrediente").each((i, element) => {
+      const ingredient = scraper(element).find("label");
 
       const ingredientText = ingredient.text();
 
@@ -76,32 +81,24 @@ const scrapeData = (url, callback) => {
         result.ingredients.push(ingredientText);
       }
     });
-
-    chr("div .apartado").each((i, element) => {
-      const instruction = chr(element)
+    
+    scraper("div .apartado").each((i, element) => {
+      const instruction = scraper(element)
         .find("div.orden")
         .next();
 
-      result.instructions.push(instruction.text());
+      if (instruction.text().length > 0){
+        result.instructions.push(instruction.text());
+      }      
+      
     });
 
     callback(cleanResult(result));
   });
 };
 
-const encodeQuery = query => {
-  return query
-    .toLowerCase()
-    .split(" ")
-    .join("+");
-};
-
 const cleanResult = result => {
-  result.instructions = result.instructions.slice(
-    0,
-    result.instructions.length - 3
-  );
-
+  result.instructions.pop();
   result.instructions.push("Pronto!");
 
   for (let i = 0; i < result.ingredients.length; i++) {
@@ -117,7 +114,14 @@ const cleanResult = result => {
   return result;
 };
 
+const encodeQuery = query => {
+  return query
+    .toLowerCase()
+    .split(" ")
+    .join("+");
+};
+
 module.exports = {
-  getResults: getResults,
+  searchRecipe: searchRecipe,
   encodeQuery: encodeQuery
 };
