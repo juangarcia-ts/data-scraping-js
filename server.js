@@ -9,7 +9,7 @@ router.get("/:recipe", function(req, res) {
 
   const query = encodeQuery(req.params.recipe);
 
-  searchRecipe(encodeQuery(query), function(json) {
+  searchRecipe(query, function(json) {
     res.send(json);
 
     console.timeEnd("endpointDuration");

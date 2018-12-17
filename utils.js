@@ -21,7 +21,6 @@ const searchRecipe = (query, callback) => {
     }
 
     const scraper = cheerio.load(html);
-
     const searchResults = [];
 
     scraper("div.resultado.link").each((index, element) => {
@@ -36,11 +35,11 @@ const searchRecipe = (query, callback) => {
       });
     });
 
-    scrapeData(searchResults[0].link, callback);
+    scrapeData(query, searchResults[0].link, callback);
   });
 };
 
-const scrapeData = (url, callback) => {
+const scrapeData = (query, url, callback) => {
   request(url, options, (error, res, html) => {
     if (error || res.statusCode !== 200) {
       return `${res.statusCode}: ${error}`;
@@ -50,6 +49,7 @@ const scrapeData = (url, callback) => {
 
     let result = {
       title: "",
+      confidence: 0.0,
       link: url,
       properties: {},
       ingredients: [],
@@ -57,6 +57,7 @@ const scrapeData = (url, callback) => {
     };
 
     result.title = scraper("h1.titulo.titulo--articulo").text();
+    result.confidence = calculateConfidence(query, result.title);
 
     const properties = scraper("div.properties");
     result.properties.portion = properties
@@ -99,7 +100,7 @@ const scrapeData = (url, callback) => {
 
 const cleanResult = result => {
   result.instructions.pop();
-  result.instructions.push("Pronto!");
+  result.instructions.push("Pronto!");  
 
   for (let i = 0; i < result.ingredients.length; i++) {
     let str = result.ingredients[i].replace(/\n/g, "");
@@ -120,6 +121,20 @@ const encodeQuery = query => {
     .split(" ")
     .join("+");
 };
+
+const calculateConfidence = (query, title) => {
+  const queryWords = query.split("+");
+  const titleWords = title.toLowerCase().split(" ");
+  let successRate = 0;
+
+  for (index in queryWords) {
+    if (titleWords.indexOf(queryWords[index]) !== -1) {
+      successRate = successRate + 1;      
+    }
+  } 
+
+  return (successRate/queryWords.length);
+}
 
 module.exports = {
   searchRecipe: searchRecipe,
